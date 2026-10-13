@@ -252,4 +252,4 @@
   REPO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  https://github.com/Dreadonyx/Certs-Automator
+  https://github.com/H3M4N1H/Certs-Automator
