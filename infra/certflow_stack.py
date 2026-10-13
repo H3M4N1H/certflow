@@ -9,7 +9,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 
-REPO_URL = "https://github.com/Dreadonyx/Certs-Automator.git"
+REPO_URL = "https://github.com/H3M4N1H/Certs-Automator.git"
 
 # User-data script that runs at first boot (as root).
 # It installs Docker and docker-compose, then clones the repo and
