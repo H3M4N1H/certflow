@@ -20,7 +20,7 @@ public class LocalEngineTest {
             while((n=in.read(buffer))!=-1)out.write(buffer,0,n);
             script=out.toString("UTF-8");
         }
-        Python.getInstance().getModule("builtins").callAttr("exec",script);
+        Python.getInstance().getModule("builtins").callAttr("exec",script,Python.getInstance().getModule("builtins").callAttr("dict"));
         CredentialVault.put("instrumentation-only");
         assertEquals("instrumentation-only",CredentialVault.get());
         CredentialVault.clear();assertEquals("",CredentialVault.get());

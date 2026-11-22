@@ -16,9 +16,19 @@ public class MainActivity extends Activity {
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
+        int systemAppearance = android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        if(Build.VERSION.SDK_INT>=26) systemAppearance |= android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        getWindow().getDecorView().setSystemUiVisibility(systemAppearance);
         if (saved != null) {exportToken=saved.getString("exportToken");exportName=saved.getString("exportName");}
         LinearLayout layout = new LinearLayout(this);layout.setOrientation(LinearLayout.VERTICAL);
-        Button background = new Button(this);background.setText("Background mail options");layout.addView(background);
+        layout.setOnApplyWindowInsetsListener((view,insets)->{
+            if(Build.VERSION.SDK_INT>=30){
+                android.graphics.Insets bars=insets.getInsets(android.view.WindowInsets.Type.systemBars());
+                view.setPadding(bars.left,bars.top,bars.right,bars.bottom);
+            }else view.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
+            return insets;
+        });
+        Button background = new Button(this);background.setText("Background mail options");background.setAllCaps(false);layout.addView(background);
         background.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle("Scheduled email")
             .setMessage("Android can delay delivery or stop an active session. Recovery work runs when Android permits. Core editing works offline.")
             .setPositiveButton("Start active session", (d,w)-> {

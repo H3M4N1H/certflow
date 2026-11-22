@@ -35,3 +35,19 @@ guide.txt
 *.pem
 *.key
 *.crt
+
+# Native builds and private application state must not enter web images
+android/
+desktop/
+packaging/
+build/
+dist/
+mailer/
+certs/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.eml
+*.jks
+*.keystore

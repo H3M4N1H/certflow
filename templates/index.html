@@ -11,7 +11,7 @@
     <script>window.csrfToken={{ csrf_token|tojson }};const _fetch=window.fetch;window.fetch=(u,o={})=>{o.headers=new Headers(o.headers||{});o.headers.set('X-CSRFToken',window.csrfToken);return _fetch(u,o)};</script>
 </head>
 <body>
-<p id="localScheduleNote" hidden class="info-box">Installed app: scheduled sending uses a local worker, with no hosted cron required. Keep the desktop app open or enable background operation. On Android, use Background mail options; Android may delay recovery. Uncertain deliveries need review before retry.</p>
+
     <div class="container">
 
         <div class="header">
@@ -281,6 +281,8 @@ CertFlow</textarea>
                 job pointing at <code>/mailer/send-next?secret=MAILER_SECRET</code> every 4 minutes to
                 drive delivery automatically. Installed applications use their local scheduler instead. Provider limits still apply.
             </div>
+
+            <p id="localScheduleNote" hidden class="info-box">Installed app: scheduled sending uses a local worker, with no hosted cron required. Keep the desktop app open or enable background operation. On Android, use Background mail options; Android may delay recovery. Uncertain deliveries need review before retry.</p>
 
             <!-- Gmail config notice -->
             <div id="mailerGmailNotice" class="alert" style="display:none;margin-bottom:14px;"></div>
@@ -1018,6 +1020,10 @@ CertFlow</textarea>
                         const wSec = d.next_send_in_seconds ?? '?';
                         text.textContent = `Waiting — next send in ${wMin} min (${wSec} s).`;
                         break;
+                    case 'uncertain':
+                        dot.classList.add('paused');
+                        text.textContent = 'Delivery uncertain — review the affected recipient below before retrying.';
+                        break;
                     case 'manual_pause':
                         dot.classList.add('paused');
                         text.textContent = 'Paused by you — click Resume to continue.';
@@ -1035,10 +1041,10 @@ CertFlow</textarea>
                         text.textContent = `✓ All ${d.sent} emails sent. Queue complete.`;
                         break;
                     case 'empty':
-                        text.textContent = 'Queue is empty. Load a CSV or JSON file to start.';
+                        text.textContent = 'Queue is empty. Prepare the emails configured in Step 5.';
                         break;
                     case 'idle':
-                        text.textContent = 'Queue loaded — trigger a send or wait for cron.';
+                        text.textContent = 'Queue loaded — resume scheduled sending to continue.';
                         break;
                     default:
                         text.textContent = `Status: ${d.status}`;
