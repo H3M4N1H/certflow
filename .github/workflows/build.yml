@@ -152,5 +152,6 @@ jobs:
           sha256sum *.apk *.exe *.tar.gz > SHA256SUMS.txt
       - name: Publish testing prerelease
         run: |
-          gh release create "$TEST_TAG" artifacts/* --target "$SOURCE_SHA" --prerelease --draft --title "CertFlow $TEST_TAG" --notes-file docs/TEST_RELEASE.md
+          test "$(gh api "repos/$GH_REPO/git/ref/tags/$TEST_TAG" --jq '.object.sha')" = "$SOURCE_SHA"
+          gh release create "$TEST_TAG" artifacts/* --verify-tag --prerelease --draft --title "CertFlow $TEST_TAG" --notes-file docs/TEST_RELEASE.md
           gh release edit "$TEST_TAG" --draft=false
