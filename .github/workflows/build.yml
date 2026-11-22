@@ -5,10 +5,20 @@ on:
     branches: [main]
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      publish_run:
+        description: 'Successful build run to publish as a testing prerelease (blank runs builds)'
+        required: false
+        type: string
+      test_tag:
+        description: 'New test release tag, for example test-2.0.0-beta.1'
+        required: false
+        type: string
 permissions:
   contents: read
 jobs:
   test:
+    if: inputs.publish_run == ''
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -95,3 +105,52 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: gh release create "$TAG" artifacts/* --draft --title "CertFlow $TAG" --notes 'Testing artifacts. Android APK uses debug signing; review platform validation and sign production builds before publication.'
+  publish_test:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_run != ''
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_RUN: ${{ inputs.publish_run }}
+      TEST_TAG: ${{ inputs.test_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source build
+        run: |
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]
+          [[ "$TEST_TAG" =~ ^test-[a-zA-Z0-9._-]+$ ]]
+          gh run view "$SOURCE_RUN" --json conclusion,headSha,headBranch,workflowName > source.json
+          python - <<'PY'
+          import json
+          import os
+          data = json.load(open('source.json'))
+          assert data['conclusion'] == 'success', 'Source build did not succeed'
+          assert data['headBranch'] == 'feat/local-apps-interactive-editor', 'Unexpected source branch'
+          assert data['workflowName'] == 'Test and build applications', 'Unexpected workflow'
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write('SOURCE_SHA=' + data['headSha'] + '\n')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.publish_run }}
+          github-token: ${{ github.token }}
+          pattern: CertFlow-*
+          merge-multiple: true
+          path: artifacts
+      - name: Verify APK and prepare checksums
+        run: |
+          test -s artifacts/app-debug.apk
+          test -s artifacts/CertFlow-Windows-Setup.exe
+          test -s artifacts/CertFlow-Linux-x86_64.tar.gz
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose artifacts/app-debug.apk
+          python scripts/check_release.py artifacts/app-debug.apk
+          mv artifacts/app-debug.apk artifacts/CertFlow-Android-debug.apk
+          cd artifacts
+          sha256sum *.apk *.exe *.tar.gz > SHA256SUMS.txt
+      - name: Publish testing prerelease
+        run: |
+          gh release create "$TEST_TAG" artifacts/* --target "$SOURCE_SHA" --prerelease --draft --title "CertFlow $TEST_TAG" --notes-file docs/TEST_RELEASE.md
+          gh release edit "$TEST_TAG" --draft=false
