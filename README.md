@@ -8,7 +8,7 @@ Made this because generating 200 individual certificates by hand was not happeni
 
 1. Upload your certificate PNG template
 2. Paste participant names + departments (one per line)
-3. Adjust text position, size, font, and color
+3. Add text layers, bind CSV columns, and drag/style them on the certificate
 4. Preview → generate → download all as ZIP
 
 ## Bulk Certificate Editor
@@ -50,30 +50,14 @@ POST /bulk-editor/process → bulk image edits, returns ZIP
 
 ### Dynamic text and resumable email sending
 
-Upload a CSV (or paste CSV data) in Step 2. Step 3 creates a text field for each
-non-email column. Choose a column, adjust its position/font/color, and use **Add
-text field** or **Remove** to control what appears on the certificate. Use the
-header-row selector for custom column names or headerless files. Name the email
-column `Email`, `Email ID`, or `Email Address`; without a header, put email
-addresses in the last column. Email templates accept `{string1}`, `{string2}`, …
-for every text column; `{name}` and `{department}` remain aliases for the first two.
+Upload a CSV (or paste CSV data) in Step 2. Use the interactive editor in Step 3
+to add independent text fields, choose CSV columns, and drag or resize them.
+Manual X/Y inputs remain under Precise position. Save/reload layouts as JSON.
 
-The main email sender supports **Pause** and **Resume**. Pause takes effect after
-the current email finishes. Temporary SMTP/network failures retry after 15 seconds,
-using SQLite checkpoints to skip completed rows and retain ZIP attachment order.
-Keep the page open: its current batch payload and SMTP credentials stay in browser
-memory, so refreshing/closing the page loses the ability to resume that batch from
-the UI. Authentication errors require correcting the password and clicking Resume.
-Permanent recipient errors are logged as failed and sending continues.
+Configure email once in Step 5. Send continuously there, or prepare the same
+messages in Step 6 for scheduled sending with randomized gaps and cooldowns.
+Both modes preserve pause/resume and checkpoints. Uncertain delivery is held
+for explicit review instead of blindly retrying.
 
-The throttled mailer also supports **Pause** and **Resume**, preserving its existing
-timing limits. Connection failures leave the recipient pending; the next scheduled
-cron trigger (or **Trigger Next Send**) retries after a minimum 60-second cooldown.
-Concurrent cron/browser triggers are serialized. As with any SMTP retry, a lost
-acknowledgement after server acceptance can cause a duplicate delivery for that row.
-
-Regression checks (no real emails are sent):
-
-```bash
-.venv/bin/python -m unittest discover -s tests -v
-```
+See [Cross-platform applications and build guide](CROSS_PLATFORM.md) for desktop
+packaging, local Android generation, background scheduling, signing, limits and tests.

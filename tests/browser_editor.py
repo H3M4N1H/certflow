@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory() as directory:
                 assert abs(after['y']-before['y']-20/before['scale'])<=1
                 page.locator('[data-action=undo]').click();assert page.evaluate('editor.fields[0].X')==before['x']
                 page.locator('[data-action=redo]').click();assert page.evaluate('editor.fields[0].X')==after['x']
-                page.locator('[data-action=in]').click();page.locator('[data-action=fit]').click()
+                page.locator('[data-action=in]').click();page.locator('[data-action=fit]').click();page.wait_for_timeout(400)
                 # Real browser touch input, not mouse events labeled as touch.
                 page.locator('.editor-object').scroll_into_view_if_needed();box=page.locator('.editor-object').bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
                 before_touch=page.evaluate('editor.fields[0].Y');factor=page.evaluate('editor.factor')
@@ -46,11 +46,11 @@ with tempfile.TemporaryDirectory() as directory:
                 page.wait_for_timeout(250)
                 with page.expect_download() as downloaded:page.locator('[data-action=save]').click()
                 layout=Path(directory)/f'layout-{width}.json';downloaded.value.save_as(layout)
-                saved=page.evaluate('JSON.stringify(editor.fields)')
+                saved=page.evaluate('editor.fields')
                 page.locator('[data-action=delete]').click()
                 page.locator('.editor-load input').set_input_files(layout)
                 page.wait_for_function('() => editor.fields.length===2')
-                assert page.evaluate('JSON.stringify(editor.fields)')==saved
+                assert page.evaluate('editor.fields')==saved
                 page.locator('#previewBtn').click();page.wait_for_selector('#previewImage[src^="data:"]')
                 with page.expect_download() as downloaded:page.locator('#generateBtn').click()
                 assert downloaded.value.suggested_filename.endswith('.zip')

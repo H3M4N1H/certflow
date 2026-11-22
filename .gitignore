@@ -5,3 +5,17 @@ infra/.venv/
 infra/cdk.out/
 __pycache__/
 *.pyc
+
+# Local builds and private application state (release inputs are allowlisted)
+.venv/
+build/
+dist/
+android/.gradle/
+android/**/build/
+android/local.properties
+*.jks
+*.keystore
+*.db
+*.db-*
+*.mailer.lock
+output_certs/

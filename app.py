@@ -87,6 +87,11 @@ def init_db():
             completed TEXT NOT NULL DEFAULT '{}', paused INTEGER NOT NULL DEFAULT 0,
             lease REAL NOT NULL DEFAULT 0
         )""")
+        columns = {row[1] for row in conn.execute('PRAGMA table_info(send_jobs)')}
+        if 'payload' not in columns:
+            conn.execute("ALTER TABLE send_jobs ADD COLUMN payload TEXT NOT NULL DEFAULT '{}'")
+        if 'created_at' not in columns:
+            conn.execute('ALTER TABLE send_jobs ADD COLUMN created_at REAL NOT NULL DEFAULT 0')
         conn.commit()
 
 init_db()
@@ -419,7 +424,10 @@ def draw_certificate(template_image, str1, str2, settings, str3='', values=None)
             font = load_font(field['Font'], field['FontSize'], field.get('Bold') in (True, 'true', 'True', '1', 1))
             if field.get('Anchor') == 'top':
                 tile, offset = render_text_tile(field, text)
-                cert.paste(tile, (field['X'] + offset, field['Y']), tile)
+                if cert.mode == 'RGBA':
+                    cert.alpha_composite(tile, dest=(field['X'] + offset, field['Y']))
+                else:
+                    cert.paste(tile, (field['X'] + offset, field['Y']), tile)
             else:
                 draw.text((field['X'], field['Y']), text, fill=hex_to_rgb(field['Color']), font=font)
         return cert
@@ -476,7 +484,7 @@ def editor_text():
             tile, offset = render_text_tile(field, text)
             result.append(dict(width=tile.width, height=tile.height, offset=offset,
                 image='data:image/png;base64,' + base64.b64encode(image_to_bytes(tile, 'PNG')).decode()))
-        return jsonify(fields=result)
+        return jsonify(fields=result, normalizedFields=fields)
     except (ValueError, KeyError, TypeError) as exc:
         return jsonify(error=str(exc)), 400
 
@@ -973,9 +981,10 @@ def generate_batch():
 
         def certificates():
             for p in participants:
-                yield draw_certificate(template_image, p.get('string1') or p.get('name', ''),
+                cert = draw_certificate(template_image, p.get('string1') or p.get('name', ''),
                     p.get('string2') or p.get('department', ''), settings,
-                    str3=p.get('string3', ''), values=p['values']).convert('RGB')
+                    str3=p.get('string3', ''), values=p['values'])
+                yield cert.convert('RGB') if pil_format in ('PDF', 'JPEG') else cert
         certs = certificates()
 
         buf = io.BytesIO()
@@ -1159,7 +1168,8 @@ def retryable_mail_error(error):
 
 
 def send_job_owner():
-    return hashlib.sha256(session.get('_csrf_token', '').encode()).hexdigest()
+    identity = 'local-owner' if session.get('local_access') else session.get('_csrf_token', '')
+    return hashlib.sha256(identity.encode()).hexdigest()
 
 
 @app.route('/send-jobs/<job_id>/control', methods=['POST'])
@@ -1168,14 +1178,40 @@ def send_job_owner():
 def control_send_job(job_id):
     require_csrf()
     action = (request.get_json(silent=True) or {}).get('action')
-    if action not in ('pause', 'resume'):
+    if action not in ('pause', 'resume', 'confirm-delivered', 'retry-uncertain'):
         return jsonify(error='Invalid action'), 400
     with closing(sqlite3.connect(DB_PATH)) as conn, conn:
+        if action in ('confirm-delivered', 'retry-uncertain'):
+            job = conn.execute('SELECT completed,lease FROM send_jobs WHERE id=? AND owner=?', (job_id,send_job_owner())).fetchone()
+            if not job:
+                return jsonify(error='Send job not found'), 404
+            if job[1] > time.time():
+                return jsonify(error='Wait for the current worker to finish.'), 409
+            completed=json.loads(job[0])
+            for index,status in list(completed.items()):
+                if status in ('uncertain', 'sending'):
+                    if action == 'confirm-delivered': completed[index]='sent'
+                    else: del completed[index]
+            conn.execute('UPDATE send_jobs SET completed=? WHERE id=?', (json.dumps(completed),job_id))
+            return jsonify(success=True)
         changed = conn.execute('UPDATE send_jobs SET paused=? WHERE id=? AND owner=?',
                                (int(action == 'pause'), job_id, send_job_owner())).rowcount
     if not changed:
         return jsonify(error='Send job not found'), 404
     return jsonify(success=True)
+
+
+@app.route('/send-jobs/latest')
+@login_required
+def latest_send_job():
+    with closing(sqlite3.connect(DB_PATH)) as conn:
+        job=conn.execute('SELECT id,payload,completed FROM send_jobs WHERE owner=? ORDER BY created_at DESC LIMIT 1', (send_job_owner(),)).fetchone()
+    if not job:
+        return jsonify(job=None)
+    payload=json.loads(job[1]); completed=json.loads(job[2])
+    if not payload or len(completed)==len(payload.get('participants', [])) and all(s not in ('sending','uncertain') for s in completed.values()):
+        return jsonify(job=None)
+    return jsonify(job=dict(payload,jobId=job[0]), uncertain=any(s in ('sending','uncertain') for s in completed.values()))
 
 
 def prepare_email_batch(data):
@@ -1263,8 +1299,11 @@ def send_certificates():
             return jsonify(error='Send job does not match this request'), 409
         if job[4] > time.time():
             return jsonify(error='The previous send is still finishing. Retry shortly.'), 409
-        conn.execute('UPDATE send_jobs SET lease=? WHERE id=?', (lease, job_id))
         completed = json.loads(job[2])
+        completed = {key: ('uncertain' if value == 'sending' else value) for key,value in completed.items()}
+        safe_payload = {key:value for key,value in data.items() if key != 'smtpPassword'}
+        conn.execute('UPDATE send_jobs SET lease=?, payload=?, created_at=?, completed=? WHERE id=?',
+                     (lease, json.dumps(safe_payload), time.time(), json.dumps(completed), job_id))
 
     def checkpoint(index, status):
         completed[str(index)] = status
@@ -1272,7 +1311,7 @@ def send_certificates():
             conn.execute('UPDATE send_jobs SET completed=?, lease=? WHERE id=?',
                          (json.dumps(completed), time.time() + 600, job_id))
 
-    def stream():
+    def stream_locked():
         results = [{'status': status} for status in completed.values() if status != 'skip']
         skipped = sum(status == 'skip' for status in completed.values())
         service = _InlineEmailService()
@@ -1280,6 +1319,10 @@ def send_certificates():
         try:
             # ── Initial SSE buffer flush for Gunicorn / reverse proxies ───────────
             yield ": " + (" " * 1024) + "\n\n"
+
+            if 'uncertain' in completed.values():
+                yield f"data: {json.dumps({'type':'uncertain', 'message':'A delivery acknowledgement was lost. Check sent mail and resolve before resuming.'})}\n\n"
+                return
 
             # ── Connect ──────────────────────────────────────────────────────────
             try:
@@ -1319,14 +1362,27 @@ def send_certificates():
                     msg = build_email_message(data, p, i, service.sender, template_image,
                                               settings, extra_attachments, out_fmt, out_ext)
 
-                    service.send(msg, email_addr)
+                    checkpoint(i, 'sending')
+                    try:
+                        service.send(msg, email_addr)
+                    except (smtplib.SMTPServerDisconnected, TimeoutError, OSError) as exc:
+                        if isinstance(exc, (smtplib.SMTPResponseException, smtplib.SMTPRecipientsRefused)):
+                            raise
+                        checkpoint(i, 'uncertain')
+                        raise DeliveryUncertain() from exc
 
                     checkpoint(i, 'sent')
                     results.append({'name': p_name, 'status': 'sent'})
                     yield f"data: {json.dumps({'type': 'sent', 'name': p_name, 'email': email_addr, 'index': i + 1, 'total': total})}\n\n"
 
                 except Exception as e:
+                    if isinstance(e, DeliveryUncertain):
+                        yield f"data: {json.dumps({'type':'uncertain', 'message':'Delivery uncertain. Review sent mail before retrying this recipient.'})}\n\n"
+                        return
                     if retryable_mail_error(e):
+                        completed.pop(str(i), None)
+                        with closing(sqlite3.connect(DB_PATH)) as conn, conn:
+                            conn.execute('UPDATE send_jobs SET completed=? WHERE id=?', (json.dumps(completed), job_id))
                         yield f"data: {json.dumps({'type': 'retry', 'message': f'Temporary mail failure; retrying this row in 15 seconds: {e}'})}\n\n"
                         return
                     checkpoint(i, 'failed')
@@ -1343,6 +1399,13 @@ def send_certificates():
             service.close()
             with closing(sqlite3.connect(DB_PATH)) as conn, conn:
                 conn.execute('UPDATE send_jobs SET lease=0 WHERE id=?', (job_id,))
+
+    def stream():
+        with queue_lock(DB_PATH + '.' + job_id) as acquired:
+            if not acquired:
+                yield f"data: {json.dumps({'type':'retry', 'message':'Another worker is finishing this job.'})}\n\n"
+                return
+            yield from stream_locked()
 
     return Response(stream_with_context(stream()), mimetype='text/event-stream',
                     headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
@@ -1506,6 +1569,8 @@ def _tm_send_one(recipient_id, email, name, cert_path):
     try:
         server.sendmail(sender, [email], msg.as_bytes())
     except (smtplib.SMTPServerDisconnected, TimeoutError, OSError) as exc:
+        if isinstance(exc, (smtplib.SMTPResponseException, smtplib.SMTPRecipientsRefused)):
+            raise
         raise DeliveryUncertain() from exc
     finally:
         try:

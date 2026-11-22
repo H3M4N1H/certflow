@@ -28,7 +28,7 @@ class CertificateEditor {
                 const response = await fetch('/editor/text', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({fields:data.fields})});
                 if (!response.ok) throw Error('Invalid layout fields.');
                 if (this.template.naturalWidth && (data.width !== this.template.naturalWidth || data.height !== this.template.naturalHeight)) throw Error('Load a template with the layout’s original dimensions first.');
-                this.remember(); this.fields = data.fields; this.selected = this.fields.length ? 0 : -1; this.properties(); this.refresh();
+                this.remember(); this.fields = (await response.json()).normalizedFields; this.selected = this.fields.length ? 0 : -1; this.properties(); this.refresh();
             } catch (e) { this.message(e.message); }
         };
         this.stage.onkeydown = e => {
@@ -110,7 +110,7 @@ class CertificateEditor {
             const t=this.tiles?.[i];if(!t)return;
             const el=document.createElement('div');el.className='editor-object'+(i===this.selected?' selected':'');el.dataset.index=i;
             const sizeRatio=f.FontSize/(t.fontSize||f.FontSize);
-            Object.assign(el.style,{left:`${(f.X+t.offset*sizeRatio)*this.factor}px`,top:`${f.Y*this.factor}px`,width:`${Math.max(12,t.width*sizeRatio*this.factor)}px`,height:`${Math.max(12,t.height*sizeRatio*this.factor)}px`});
+            Object.assign(el.style,{left:`${(f.X+t.offset*sizeRatio)*this.factor}px`,top:`${f.Y*this.factor}px`,width:`${t.width*sizeRatio*this.factor}px`,height:`${t.height*sizeRatio*this.factor}px`});
             const img=new Image();img.src=t.image;img.draggable=false;el.append(img);
             const handle=document.createElement('span');handle.className='editor-resize';el.append(handle);
             el.onpointerdown=e=> {

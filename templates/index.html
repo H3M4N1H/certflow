@@ -246,7 +246,11 @@ CertFlow</textarea>
             <button class="btn btn-primary" id="sendBtn" style="margin-top:14px;" disabled>Send Automated Certificates via Email</button>
             <button type="button" class="btn btn-secondary" id="pauseSendBtn" disabled>Pause</button>
             <button type="button" class="btn btn-secondary" id="resumeSendBtn" disabled>Resume</button>
-            <p>Keep this page open to retry automatically. Pause finishes the current email first. If the mail server accepts an email but its acknowledgement is lost, retrying may deliver that email twice.</p>
+            <span id="uncertainSendControls" hidden>
+                <button type="button" class="btn btn-secondary" data-resolve="confirm-delivered">Mark uncertain email delivered</button>
+                <button type="button" class="btn btn-secondary" data-resolve="retry-uncertain">Retry uncertain email (may duplicate)</button>
+            </span>
+            <p>Keep this page open to retry automatically. Pause finishes the current email first. Lost delivery acknowledgements pause the job for review. After reopening, re-enter your SMTP password to resume saved progress.</p>
 
             <!-- Live send log -->
             <div id="sendProgress" style="display:none; margin-top:16px;">
@@ -730,6 +734,22 @@ CertFlow</textarea>
             };
         }
 
+        document.querySelectorAll('[data-resolve]').forEach(button=>button.onclick=async()=>{
+            if(!activeSendPayload||!confirm(button.textContent+'? Verify delivery in your sent mail first.'))return;
+            const response=await fetch(`/send-jobs/${activeSendPayload.jobId}/control`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:button.dataset.resolve})});
+            if(response.ok){document.getElementById('uncertainSendControls').hidden=true;document.getElementById('sendStatus').textContent='Delivery resolved. Resume to continue.';}
+            else alert('The worker is still finishing. Try again shortly.');
+        });
+        (async()=>{
+            const response=await fetch('/send-jobs/latest');if(!response.ok)return;
+            const data=await response.json();if(!data.job||activeSendPayload)return;
+            activeSendPayload=data.job;sendPaused=true;
+            document.getElementById('sendProgress').style.display='block';
+            document.getElementById('resumeSendBtn').disabled=false;
+            document.getElementById('sendStatus').textContent='Saved bulk job found. Re-enter its SMTP password and Resume to continue.';
+            document.getElementById('uncertainSendControls').hidden=!data.uncertain;
+        })();
+
         async function controlSend(action) {
             if (!activeSendPayload) return;
             const response = await fetch(`/send-jobs/${activeSendPayload.jobId}/control`, {
@@ -781,6 +801,9 @@ CertFlow</textarea>
                             appendLog(sendLog, `[Sent] ${evt.name} -> ${evt.email}`, 'log-success');
                         } else if (evt.type === 'failed') {
                             appendLog(sendLog, `[Failed] ${evt.name} — ${evt.reason}`, 'log-error');
+                        } else if (evt.type === 'uncertain') {
+                            sendPaused=true;
+                            document.getElementById('uncertainSendControls').hidden=false;
                         } else if (evt.type === 'paused') {
                             sendPaused = true;
                         } else if (evt.type === 'error') {

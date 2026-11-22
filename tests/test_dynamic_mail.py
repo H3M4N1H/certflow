@@ -68,7 +68,10 @@ class WorkflowTests(unittest.TestCase):
             def quit(self): pass
         with patch.object(module, '_make_smtp_connection', return_value=SMTP()):
             first = self.post('/send-certificates', self.payload()).get_data(as_text=True)
-            self.assertIn('"type": "retry"', first)
+            self.assertIn('"type": "uncertain"', first)
+            blocked = self.post('/send-certificates', self.payload()).get_data(as_text=True)
+            self.assertIn('"type": "uncertain"', blocked)
+            self.post('/send-jobs/test-job-1234567890/control', {'action':'retry-uncertain'})
             second = self.post('/send-certificates', self.payload()).get_data(as_text=True)
             self.assertIn('"sent": 2', second)
             third = self.post('/send-certificates', self.payload()).get_data(as_text=True)
