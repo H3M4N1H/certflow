@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=CertFlow
+Comment=Design and generate certificates locally
+Exec=CertFlow
+Icon=certflow
+Terminal=false
+Categories=Office;Graphics;

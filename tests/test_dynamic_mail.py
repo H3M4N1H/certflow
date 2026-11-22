@@ -68,7 +68,10 @@ class WorkflowTests(unittest.TestCase):
             def quit(self): pass
         with patch.object(module, '_make_smtp_connection', return_value=SMTP()):
             first = self.post('/send-certificates', self.payload()).get_data(as_text=True)
-            self.assertIn('"type": "retry"', first)
+            self.assertIn('"type": "uncertain"', first)
+            blocked = self.post('/send-certificates', self.payload()).get_data(as_text=True)
+            self.assertIn('"type": "uncertain"', blocked)
+            self.post('/send-jobs/test-job-1234567890/control', {'action':'retry-uncertain'})
             second = self.post('/send-certificates', self.payload()).get_data(as_text=True)
             self.assertIn('"sent": 2', second)
             third = self.post('/send-certificates', self.payload()).get_data(as_text=True)
@@ -127,7 +130,7 @@ class WorkflowTests(unittest.TestCase):
         participants, columns = module.parse_csv_rows([['Alice', 'IT', 'Gold', '2026', 'Meet']], 'no')
         self.assertEqual(len(columns), 5)
         with self.assertRaises(ValueError):
-            module.validate_settings({'fields': [{'column': -1}]})
+            module.validate_settings({'fields': [{'column': -2}]})
         with self.assertRaises(ValueError):
             module.validate_participants([{'name': 'Alice', 'values': ['x' * 201]}])
 

@@ -1,0 +1,58 @@
+plugins {
+    id 'com.android.application'
+    id 'com.chaquo.python'
+}
+android {
+    namespace 'org.certflow.app'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'org.certflow.app'
+        minSdk 24
+        targetSdk 36
+        versionCode 1
+        versionName '2.0.0'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        ndk { abiFilters 'arm64-v8a', 'x86_64' }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    signingConfigs {
+        release {
+            if (System.getenv('ANDROID_KEYSTORE')) {
+                storeFile file(System.getenv('ANDROID_KEYSTORE'))
+                storePassword System.getenv('ANDROID_STORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes { release { if (System.getenv('ANDROID_KEYSTORE')) signingConfig signingConfigs.release } }
+    sourceSets { main { assets.srcDir layout.buildDirectory.dir('generated/certflowAssets') } }
+}
+chaquopy {
+    defaultConfig {
+        version '3.11'
+        pip {
+            install 'Flask==3.1.0'
+            install 'Werkzeug==3.1.3'
+            install 'Pillow==11.0.0'
+            install 'argon2-cffi==23.1.0'
+            install 'Flask-Limiter==3.12'
+        }
+    }
+    sourceSets { main { srcDir layout.buildDirectory.dir('generated/certflowPython') } }
+}
+tasks.register('stagePython', Sync) {
+    from('../..') { include 'app.py', 'local_runtime.py', 'local_worker.py', 'credential_store.py' }
+    into layout.buildDirectory.dir('generated/certflowPython')
+}
+tasks.register('stageAssets', Sync) {
+    from('../..') { include 'templates/**', 'static/**' }
+    into layout.buildDirectory.dir('generated/certflowAssets/runtime')
+}
+tasks.configureEach { if ((name.startsWith('generate') || name.startsWith('merge')) && name.contains('Python')) dependsOn 'stagePython' }
+tasks.named('preBuild') { dependsOn 'stagePython', 'stageAssets' }
+dependencies {
+    implementation 'androidx.work:work-runtime:2.10.5'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+}

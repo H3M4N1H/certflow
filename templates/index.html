@@ -6,9 +6,12 @@
     <meta name="csrf-token" content="{{ csrf_token }}">
     <title>CertFlow — Certificate Automation</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='certificate_editor.css') }}">
+    <script src="{{ url_for('static', filename='certificate_editor.js') }}"></script>
     <script>window.csrfToken={{ csrf_token|tojson }};const _fetch=window.fetch;window.fetch=(u,o={})=>{o.headers=new Headers(o.headers||{});o.headers.set('X-CSRFToken',window.csrfToken);return _fetch(u,o)};</script>
 </head>
 <body>
+
     <div class="container">
 
         <div class="header">
@@ -69,11 +72,8 @@ Robert Kumar, AI &amp; DS, Participation, robert@example.com"></textarea>
         <div class="section">
             <div class="section-title">Step 3 — Text Placement</div>
 
-            <p>Select the CSV columns to print. Add or remove text fields and set each position and style.</p>
-            <div id="textFields"></div>
-            <button type="button" class="btn btn-secondary" id="addTextField">Add text field</button>
-
-            <button class="btn btn-secondary" id="previewBtn" disabled>Preview First Certificate</button>
+            <div id="certificateEditor"></div>
+            <button class="btn btn-secondary" id="previewBtn" disabled>Preview Selected Certificate</button>
         </div>
 
         <!-- Preview -->
@@ -246,7 +246,11 @@ CertFlow</textarea>
             <button class="btn btn-primary" id="sendBtn" style="margin-top:14px;" disabled>Send Automated Certificates via Email</button>
             <button type="button" class="btn btn-secondary" id="pauseSendBtn" disabled>Pause</button>
             <button type="button" class="btn btn-secondary" id="resumeSendBtn" disabled>Resume</button>
-            <p>Keep this page open to retry automatically. Pause finishes the current email first. If the mail server accepts an email but its acknowledgement is lost, retrying may deliver that email twice.</p>
+            <span id="uncertainSendControls" hidden>
+                <button type="button" class="btn btn-secondary" data-resolve="confirm-delivered">Mark uncertain email delivered</button>
+                <button type="button" class="btn btn-secondary" data-resolve="retry-uncertain">Retry uncertain email (may duplicate)</button>
+            </span>
+            <p>Keep this page open to retry automatically. Pause finishes the current email first. Lost delivery acknowledgements pause the job for review. After reopening, re-enter your SMTP password to resume saved progress.</p>
 
             <!-- Live send log -->
             <div id="sendProgress" style="display:none; margin-top:16px;">
@@ -267,59 +271,25 @@ CertFlow</textarea>
 
         <!-- Step 6: Throttled Mailer -->
         <div class="section" id="throttled-mailer-section">
-            <div class="section-title">Step 6 — Throttled Mailer <span class="badge" style="font-size:11px;margin-left:8px;opacity:0.8;">Gmail-safe queue</span></div>
+            <div class="section-title">Step 6 — Throttled Mailer <span class="badge" style="font-size:11px;margin-left:8px;opacity:0.8;">Scheduled queue</span></div>
 
             <div class="info-box" style="margin-bottom:16px;">
                 Sends <strong>one email at a time</strong>, spaced 3–5 min apart with ±30 % jitter and a 15–25 min
-                break every 15–20 emails. State is persisted in the app's SQLite database so restarts never
-                re-send already-delivered certificates. Wire up a free
+                break every 15–20 emails. Progress is saved in SQLite; uncertain deliveries require review.
+                For hosted installations, configure a
                 <a href="https://cron-job.org" target="_blank" rel="noopener">cron-job.org</a>
                 job pointing at <code>/mailer/send-next?secret=MAILER_SECRET</code> every 4 minutes to
-                drive delivery automatically.
+                drive delivery automatically. Installed applications use their local scheduler instead. Provider limits still apply.
             </div>
+
+            <p id="localScheduleNote" hidden class="info-box">Installed app: scheduled sending uses a local worker, with no hosted cron required. Keep the desktop app open or enable background operation. On Android, use Background mail options; Android may delay recovery. Uncertain deliveries need review before retry.</p>
 
             <!-- Gmail config notice -->
             <div id="mailerGmailNotice" class="alert" style="display:none;margin-bottom:14px;"></div>
 
-            <!-- SMTP Credentials -->
-            <h3 style="margin-bottom:8px;">Sender Credentials</h3>
-            <div class="controls">
-                <div class="control-group">
-                    <label>Email Provider</label>
-                    <select id="mailerSmtpProvider" onchange="onMailerProviderChange()">
-                        <option value="gmail">Gmail</option>
-                        <option value="outlook">Outlook / Hotmail</option>
-                        <option value="yahoo">Yahoo Mail</option>
-                        <option value="zoho">Zoho Mail</option>
-                        <option value="custom">Custom SMTP</option>
-                    </select>
-                </div>
-                <div class="control-group" id="mailerSmtpHostGroup" style="display:none;">
-                    <label>SMTP Host</label>
-                    <input type="text" id="mailerSmtpHost" placeholder="smtp.example.com">
-                </div>
-                <div class="control-group" id="mailerSmtpPortGroup" style="display:none;">
-                    <label>SMTP Port</label>
-                    <input type="number" id="mailerSmtpPort" value="587">
-                </div>
-            </div>
-            <div class="controls" style="margin-top:12px;">
-                <div class="control-group">
-                    <label>Sender Email</label>
-                    <input type="email" id="mailerSmtpUser" placeholder="you@gmail.com" autocomplete="username">
-                </div>
-                <div class="control-group" style="position:relative;">
-                    <label>App Password</label>
-                    <input type="password" id="mailerSmtpPassword" placeholder="App password / token" autocomplete="current-password" style="padding-right:52px;">
-                    <button type="button" id="toggleMailerSmtpPass" onclick="(function(){var i=document.getElementById('mailerSmtpPassword');var b=document.getElementById('toggleMailerSmtpPass');var isPw=i.type==='password';i.type=isPw?'text':'password';b.textContent=isPw?'Hide':'Show';})()" style="position:absolute;right:8px;bottom:7px;background:none;border:none;cursor:pointer;font-size:12px;font-weight:600;padding:3px 6px;color:var(--text-muted);">Show</button>
-                </div>
-            </div>
-            <div style="margin-top:10px; margin-bottom:16px; display:flex; align-items:center; gap:12px;">
-                <button class="btn btn-secondary" id="mailerSaveCredsBtn" type="button" style="padding:8px 18px; font-size:13px;">Save Credentials</button>
-                <span id="mailerCredsStatus" style="font-size:13px;"></span>
-            </div>
-
-            <!-- Progress stats -->
+            <p>Uses the recipients, sender, subject, body, certificate format and ZIP attachments configured in Steps 1–5. The only difference is the sending schedule.</p>
+            <button type="button" class="btn btn-primary" id="scheduleEmailBtn">Prepare scheduled emails from Step 5</button>
+            <p id="mailerLoadStatus" role="status"></p>
             <div class="mailer-stats" id="mailerStats">
                 <div class="stat-card"><div class="stat-value" id="statTotal">—</div><div class="stat-label">Total</div></div>
                 <div class="stat-card"><div class="stat-value" id="statSent" style="color:var(--success);">—</div><div class="stat-label">Sent</div></div>
@@ -342,27 +312,12 @@ CertFlow</textarea>
                 <div class="ti-row"><span class="ti-label">100 emails ≈</span><span class="ti-val">5–6 hours total</span></div>
             </div>
 
-            <!-- Load queue from CSV / JSON -->
-            <h3 style="margin-top:20px; margin-bottom:8px;">Load Queue</h3>
-            <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">
-                Upload a CSV (<code>name,email,cert_path</code>) or JSON array
-                (<code>[{"name":"…","email":"…","cert_path":"output_certs/…"}]</code>).
-                <code>cert_path</code> is relative to the server's project root.
-            </p>
-            <div class="upload-area" id="mailerQueueUpload" style="padding:16px;">
-                <svg class="upload-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 8px auto;display:block;color:var(--text-secondary);"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-                <p>Click or drag a CSV or JSON file</p>
-                <p class="hint">CSV columns: name, email, cert_path (header row optional)</p>
-                <input type="file" id="mailerQueueFile" accept=".csv,.json,text/csv,application/json">
-            </div>
-            <div id="mailerLoadStatus" style="font-size:13px;margin-top:8px;"></div>
-
             <!-- Queue preview table -->
             <div id="mailerQueuePreviewWrap" style="display:none;">
                 <h3 style="margin-top:20px;margin-bottom:8px;">Queue Preview</h3>
                 <div class="queue-table-wrap">
                     <table class="queue-table" id="mailerQueueTable">
-                        <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Cert Path</th><th>Status</th></tr></thead>
+                        <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Attachment</th><th>Status</th></tr></thead>
                         <tbody id="mailerQueueTbody"></tbody>
                     </table>
                 </div>
@@ -505,6 +460,7 @@ CertFlow</textarea>
             const reader = new FileReader();
             reader.onload = e => {
                 templateImage = e.target.result;
+                editor.loadTemplate(templateImage);
                 const preview = document.getElementById('templatePreview');
                 if (file && file.type === 'application/pdf') {
                     preview.innerHTML = '<div class="template-preview pdf-placeholder">PDF template loaded</div>';
@@ -629,54 +585,14 @@ CertFlow</textarea>
 
         function parseParticipants() { return csvParticipants; }
 
+        const editor = new CertificateEditor(document.getElementById('certificateEditor'));
         let csvColumns = [];
         function setColumns(columns) {
-            const changed = JSON.stringify(columns) !== JSON.stringify(csvColumns);
             csvColumns = columns;
-            if (changed) {
-                document.getElementById('textFields').replaceChildren();
-                columns.forEach((_, i) => addTextField(i));
-            }
-            document.getElementById('addTextField').disabled = !columns.length;
+            editor.setData(columns, csvParticipants);
         }
-        function addTextField(column = 0) {
-            const card = document.createElement('div');
-            card.className = 'controls';
-            const add = (title, key, type, value, choices) => {
-                const group = document.createElement('label');
-                group.className = 'control-group'; group.textContent = title;
-                const input = document.createElement(choices ? 'select' : 'input');
-                input.dataset.key = key;
-                if (choices) choices.forEach(([v, label]) => input.add(new Option(label, v)));
-                else input.type = type;
-                if (type === 'checkbox') input.checked = !!value;
-                else input.value = value;
-                group.append(input); card.append(group);
-            };
-            add('CSV column', 'column', '', column, csvColumns.map((c, i) => [i, `${c} — {string${i + 1}}`]));
-            add('X (px)', 'X', 'number', column === 0 ? 420 : 76);
-            add('Y (px)', 'Y', 'number', 270 + column * 35);
-            add('Font size', 'FontSize', 'number', column === 0 ? 38 : 32);
-            add('Font', 'Font', '', 'georgia.ttf', [['georgia.ttf', 'Georgia'], ['times.ttf', 'Times New Roman'], ['arial.ttf', 'Arial']]);
-            add('Color', 'Color', 'color', '#000000');
-            add('Bold', 'Bold', 'checkbox', false);
-            const remove = document.createElement('button'); remove.type = 'button';
-            remove.className = 'btn btn-secondary'; remove.textContent = 'Remove';
-            remove.onclick = () => card.remove(); card.append(remove);
-            document.getElementById('textFields').append(card);
-        }
-        document.getElementById('addTextField').addEventListener('click', () => addTextField());
-        setColumns([]);
         function getSettings() {
-            const fields = [...document.querySelectorAll('#textFields > .controls')].map(card => {
-                const field = {};
-                card.querySelectorAll('[data-key]').forEach(input => {
-                    field[input.dataset.key] = input.type === 'checkbox' ? input.checked :
-                        (input.dataset.key === 'column' ? Number(input.value) : input.value);
-                });
-                return field;
-            });
-            return {fields, exportFormat: document.getElementById('exportFormat').value};
+            return {fields: editor.fields, exportFormat: document.getElementById('exportFormat').value};
         }
 
         // ── Preview ───────────────────────────────────────────────────────────
@@ -684,18 +600,19 @@ CertFlow</textarea>
             participants = parseParticipants();
             if (!participants.length) return alert('Add participant data first.');
             if (!templateImage)       return alert('Upload a certificate template first.');
+            const selected = participants[typeof editor !== 'undefined' ? editor.record : 0] || participants[0];
             try {
                 const res = await fetch('/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         template: templateImage,
-                        name: participants[0].name,
-                        department: participants[0].department,
-                        string1: participants[0].string1,
-                        string2: participants[0].string2,
-                        string3: participants[0].string3,
-                        values: participants[0].values,
+                        name: selected.name,
+                        department: selected.department,
+                        string1: selected.string1,
+                        string2: selected.string2,
+                        string3: selected.string3,
+                        values: selected.values,
                         ...getSettings()
                     })
                 });
@@ -704,7 +621,7 @@ CertFlow</textarea>
                     document.getElementById('previewImage').src = result.image;
                     document.getElementById('previewArea').style.display = 'block';
                     document.getElementById('previewImage').scrollIntoView({ behavior: 'smooth' });
-                    document.getElementById('previewBtn').textContent = 'Preview First Certificate';
+                    document.getElementById('previewBtn').textContent = 'Preview Selected Certificate';
                 } else { alert('Preview error: ' + result.error); }
             } catch (err) { alert('Error: ' + err.message); }
         });
@@ -801,6 +718,41 @@ CertFlow</textarea>
             } finally { btn.disabled = false; }
         });
 
+        function getEmailPayload() {
+            return {
+                template:          (currentEmailMode === 'zip' || !document.getElementById('attachCertToggle').checked ? null : templateImage),
+                participants: parseParticipants(),
+                settings:          getSettings(),
+                attachmentsZip:    (currentEmailMode === 'cert' ? null : attachmentsZipData),
+                attachCert:        document.getElementById('attachCertToggle').checked,
+                emailSubject:      document.getElementById('emailSubject').value,
+                emailBody:         document.getElementById('emailBody').value,
+                emailAttachFormat: document.getElementById('emailAttachFormat').value,
+                smtpProvider:      document.getElementById('smtpProvider').value,
+                smtpUser:          document.getElementById('smtpUser').value.trim(),
+                smtpPassword:      document.getElementById('smtpPassword').value,
+                smtpHost:          document.getElementById('smtpHost')?.value || '',
+                smtpPort:          document.getElementById('smtpPort')?.value || '587',
+                fromName:          document.getElementById('fromName').value || 'CertFlow',
+            };
+        }
+
+        document.querySelectorAll('[data-resolve]').forEach(button=>button.onclick=async()=>{
+            if(!activeSendPayload||!confirm(button.textContent+'? Verify delivery in your sent mail first.'))return;
+            const response=await fetch(`/send-jobs/${activeSendPayload.jobId}/control`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:button.dataset.resolve})});
+            if(response.ok){document.getElementById('uncertainSendControls').hidden=true;document.getElementById('sendStatus').textContent='Delivery resolved. Resume to continue.';}
+            else alert('The worker is still finishing. Try again shortly.');
+        });
+        (async()=>{
+            const response=await fetch('/send-jobs/latest');if(!response.ok)return;
+            const data=await response.json();if(!data.job||activeSendPayload)return;
+            activeSendPayload=data.job;sendPaused=true;
+            document.getElementById('sendProgress').style.display='block';
+            document.getElementById('resumeSendBtn').disabled=false;
+            document.getElementById('sendStatus').textContent='Saved bulk job found. Re-enter its SMTP password and Resume to continue.';
+            document.getElementById('uncertainSendControls').hidden=!data.uncertain;
+        })();
+
         async function controlSend(action) {
             if (!activeSendPayload) return;
             const response = await fetch(`/send-jobs/${activeSendPayload.jobId}/control`, {
@@ -852,6 +804,9 @@ CertFlow</textarea>
                             appendLog(sendLog, `[Sent] ${evt.name} -> ${evt.email}`, 'log-success');
                         } else if (evt.type === 'failed') {
                             appendLog(sendLog, `[Failed] ${evt.name} — ${evt.reason}`, 'log-error');
+                        } else if (evt.type === 'uncertain') {
+                            sendPaused=true;
+                            document.getElementById('uncertainSendControls').hidden=false;
                         } else if (evt.type === 'paused') {
                             sendPaused = true;
                         } else if (evt.type === 'error') {
@@ -906,22 +861,7 @@ CertFlow</textarea>
             sendStatus.textContent = 'Connecting to mail server...';
             btn.disabled = true;
 
-            const payload = {
-                template:          (currentEmailMode === 'zip' || !attachCert ? null : templateImage),
-                participants,
-                settings:          getSettings(),
-                attachmentsZip:    (currentEmailMode === 'cert' ? null : attachmentsZipData),
-                attachCert:        attachCert,
-                emailSubject:      document.getElementById('emailSubject').value,
-                emailBody:         document.getElementById('emailBody').value,
-                emailAttachFormat: document.getElementById('emailAttachFormat').value,
-                smtpProvider:      document.getElementById('smtpProvider').value,
-                smtpUser:          document.getElementById('smtpUser').value.trim(),
-                smtpPassword:      document.getElementById('smtpPassword').value,
-                smtpHost:          document.getElementById('smtpHost')?.value || '',
-                smtpPort:          document.getElementById('smtpPort')?.value || '587',
-                fromName:          document.getElementById('fromName').value || 'CertFlow',
-            };
+            const payload = getEmailPayload();
 
             activeSendPayload = {...payload, jobId: Array.from(crypto.getRandomValues(new Uint8Array(24)), b => b.toString(16).padStart(2, '0')).join('')};
             sendPaused = false;
@@ -1018,8 +958,6 @@ CertFlow</textarea>
             let mailerPollerTimer = null;
 
             // ── DOM refs ─────────────────────────────────────────────────────
-            const queueUpload   = document.getElementById('mailerQueueUpload');
-            const queueFileInput= document.getElementById('mailerQueueFile');
             const loadStatus    = document.getElementById('mailerLoadStatus');
             const triggerBtn    = document.getElementById('mailerTriggerBtn');
             const refreshBtn    = document.getElementById('mailerRefreshBtn');
@@ -1028,73 +966,26 @@ CertFlow</textarea>
             const previewWrap   = document.getElementById('mailerQueuePreviewWrap');
             const queueTbody    = document.getElementById('mailerQueueTbody');
 
-            // ── Sender credentials (dynamic, per Step 5's pattern) ─────────────
-            window.onMailerProviderChange = function() {
-                const custom = document.getElementById('mailerSmtpProvider').value === 'custom';
-                document.getElementById('mailerSmtpHostGroup').style.display = custom ? '' : 'none';
-                document.getElementById('mailerSmtpPortGroup').style.display = custom ? '' : 'none';
+            document.getElementById('scheduleEmailBtn').onclick=async()=>{
+                const button=document.getElementById('scheduleEmailBtn');
+                const payload=getEmailPayload();
+                if(!payload.participants.some(p=>p.email))return alert('Load participants with email addresses first.');
+                if(!payload.smtpUser||!payload.smtpPassword)return alert('Enter the sender email and app password in Step 5.');
+                if(payload.attachCert&&currentEmailMode!=='zip'&&!payload.template)return alert('Upload a certificate template first.');
+                if(currentEmailMode!=='cert'&&!payload.attachmentsZip)return alert('Upload the ZIP attachments in Step 5.');
+                if(!confirm('Prepare these emails and replace the scheduled queue? The new queue starts paused.'))return;
+                button.disabled=true;loadStatus.textContent='Preparing the same emails as Step 5…';
+                try {
+                    const response=await fetch('/mailer/generate-queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+                    const data=await response.json();if(!response.ok)throw Error(data.error||'Could not prepare emails.');
+                    loadStatus.textContent=`${data.loaded} emails prepared; ${data.skipped} rows without email skipped. Resume to start scheduled sending.`;
+                    await fetchStatus(false);
+                }catch(e){loadStatus.textContent=e.message;}finally{button.disabled=false;}
             };
-
-            async function loadMailerCredsStatus() {
-                const statusEl = document.getElementById('mailerCredsStatus');
-                try {
-                    const res = await fetch('/mailer/get-credentials');
-                    const d = await res.json();
-                    if (d.configured) {
-                        statusEl.textContent = `Configured — sending as ${d.sender}`;
-                        statusEl.style.color = 'var(--success)';
-                        document.getElementById('mailerSmtpUser').value = d.sender;
-                    } else {
-                        statusEl.textContent = 'Not configured — set credentials above before sending.';
-                        statusEl.style.color = 'var(--error)';
-                    }
-                } catch (err) { /* non-fatal */ }
-            }
-            loadMailerCredsStatus();
-
-            document.getElementById('mailerSaveCredsBtn').addEventListener('click', async () => {
-                const btn = document.getElementById('mailerSaveCredsBtn');
-                const statusEl = document.getElementById('mailerCredsStatus');
-                const user = document.getElementById('mailerSmtpUser').value.trim();
-                const pass = document.getElementById('mailerSmtpPassword').value;
-                if (!user || !pass) {
-                    statusEl.textContent = 'Enter your sender email and app password first.';
-                    statusEl.style.color = 'var(--warning-text)';
-                    return;
-                }
-                btn.disabled = true;
-                statusEl.textContent = 'Saving…';
-                statusEl.style.color = 'var(--text-muted)';
-                try {
-                    const res = await fetch('/mailer/set-credentials', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            smtpProvider: document.getElementById('mailerSmtpProvider').value,
-                            smtpUser:     user,
-                            smtpPassword: pass,
-                            smtpHost:     document.getElementById('mailerSmtpHost')?.value || '',
-                            smtpPort:     document.getElementById('mailerSmtpPort')?.value || '587',
-                        })
-                    });
-                    const d = await res.json();
-                    if (d.success) {
-                        statusEl.textContent = `Saved — sending as ${d.sender}`;
-                        statusEl.style.color = 'var(--success)';
-                        document.getElementById('mailerSmtpPassword').value = '';
-                        fetchStatus(false);
-                    } else {
-                        statusEl.textContent = d.error || 'Failed to save credentials.';
-                        statusEl.style.color = 'var(--error)';
-                    }
-                } catch (err) {
-                    statusEl.textContent = err.message;
-                    statusEl.style.color = 'var(--error)';
-                } finally { btn.disabled = false; }
-            });
 
             // ── Status rendering ──────────────────────────────────────────────
             function renderStatus(d) {
+                if(d.local) document.getElementById('localScheduleNote').hidden=false;
                 document.getElementById('statTotal').textContent   = d.total  ?? '—';
                 document.getElementById('statSent').textContent    = d.sent   ?? '—';
                 document.getElementById('statPending').textContent = d.pending ?? '—';
@@ -1112,7 +1003,7 @@ CertFlow</textarea>
                 if (d.gmail_configured === false) {
                     notice.style.display = '';
                     notice.className = 'alert alert-error';
-                    notice.innerHTML = '⚠️ No sender credentials configured. Set them in <strong>Sender Credentials</strong> above before the throttled mailer can send.';
+                    notice.innerHTML = '⚠️ No sender credentials configured. Enter them in <strong>Step 5</strong>, then prepare the scheduled emails.';
                 } else {
                     notice.style.display = 'none';
                 }
@@ -1128,6 +1019,10 @@ CertFlow</textarea>
                         const wMin = d.next_send_in_minutes ?? '?';
                         const wSec = d.next_send_in_seconds ?? '?';
                         text.textContent = `Waiting — next send in ${wMin} min (${wSec} s).`;
+                        break;
+                    case 'uncertain':
+                        dot.classList.add('paused');
+                        text.textContent = 'Delivery uncertain — review the affected recipient below before retrying.';
                         break;
                     case 'manual_pause':
                         dot.classList.add('paused');
@@ -1146,10 +1041,10 @@ CertFlow</textarea>
                         text.textContent = `✓ All ${d.sent} emails sent. Queue complete.`;
                         break;
                     case 'empty':
-                        text.textContent = 'Queue is empty. Load a CSV or JSON file to start.';
+                        text.textContent = 'Queue is empty. Prepare the emails configured in Step 5.';
                         break;
                     case 'idle':
-                        text.textContent = 'Queue loaded — trigger a send or wait for cron.';
+                        text.textContent = 'Queue loaded — resume scheduled sending to continue.';
                         break;
                     default:
                         text.textContent = `Status: ${d.status}`;
@@ -1171,13 +1066,16 @@ CertFlow</textarea>
                         else if (isCurrent)         { badgeClass = 'next';  badgeText = '→ Next'; }
 
                         tr.className = r.status === 'sent' ? 'row-sent' : (isCurrent ? 'row-current' : 'row-pending');
-                        tr.innerHTML = `
-                            <td>${r.id}</td>
-                            <td title="${r.name}">${r.name}</td>
-                            <td title="${r.email}">${r.email}</td>
-                            <td title="${r.cert_path || ''}">${r.cert_path || '<span style="color:var(--text-muted)">—</span>'}</td>
-                            <td><span class="queue-badge ${badgeClass}">${badgeText}</span></td>
-                        `;
+                        [r.id,r.name,r.email,'As configured in Step 5',r.status].forEach(value=>{
+                            const td=document.createElement('td');td.textContent=value;tr.append(td);
+                        });
+                        if(r.status==='uncertain') {
+                            for(const [action,label] of [['sent','Mark delivered'],['retry','Retry (may duplicate)']]) {
+                                const button=document.createElement('button');button.textContent=label;
+                                button.onclick=async()=>{if(!confirm(label+'? Check your sent mail first.'))return;await fetch('/mailer/resolve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:r.id,action})});fetchStatus(false);};
+                                tr.lastChild.append(button);
+                            }
+                        }
                         queueTbody.appendChild(tr);
                     });
                 } else if (d.total > 0) {
@@ -1204,66 +1102,6 @@ CertFlow</textarea>
             // Load status on page load and auto-refresh every 30 s
             fetchStatus(false);
             mailerPollerTimer = setInterval(() => fetchStatus(false), 30000);
-
-            // ── File upload: parse CSV or JSON → load queue ───────────────────
-            queueUpload.addEventListener('click', () => queueFileInput.click());
-            queueUpload.addEventListener('dragover', e => { e.preventDefault(); queueUpload.classList.add('dragover'); });
-            queueUpload.addEventListener('dragleave', () => queueUpload.classList.remove('dragover'));
-            queueUpload.addEventListener('drop', e => {
-                e.preventDefault(); queueUpload.classList.remove('dragover');
-                const f = e.dataTransfer.files[0];
-                if (f) loadQueueFile(f);
-            });
-            queueFileInput.addEventListener('change', e => { if (e.target.files[0]) loadQueueFile(e.target.files[0]); });
-
-            async function loadQueueFile(file) {
-                loadStatus.textContent = `Reading ${file.name}…`;
-                loadStatus.style.color = 'var(--text-muted)';
-
-                let entries;
-                try {
-                    const text = await file.text();
-                    if (file.name.endsWith('.json')) {
-                        entries = JSON.parse(text);
-                        if (!Array.isArray(entries)) throw new Error('JSON must be an array.');
-                    } else {
-                        // CSV: name,email,cert_path  (header optional)
-                        const lines = text.split(/\r?\n/).filter(l => l.trim());
-                        const first = lines[0].toLowerCase();
-                        const start = (first.includes('name') || first.includes('email')) ? 1 : 0;
-                        entries = lines.slice(start).map(line => {
-                            const cols = line.split(',').map(c => c.trim());
-                            return { name: cols[0] || '', email: cols[1] || '', cert_path: cols[2] || '' };
-                        }).filter(e => e.name || e.email);
-                    }
-                } catch (err) {
-                    loadStatus.textContent = 'Parse error: ' + err.message;
-                    loadStatus.style.color = 'var(--error)';
-                    return;
-                }
-
-                loadStatus.textContent = `Parsed ${entries.length} entries — uploading to server…`;
-
-                try {
-                    const res = await fetch('/mailer/load-queue', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ queue: entries })
-                    });
-                    const d = await res.json();
-                    if (d.success) {
-                        loadStatus.textContent = `✓ Loaded ${d.loaded} recipients into queue.`;
-                        loadStatus.style.color = 'var(--success)';
-                        await fetchStatus(false);
-                    } else {
-                        loadStatus.textContent = 'Server error: ' + d.error;
-                        loadStatus.style.color = 'var(--error)';
-                    }
-                } catch (err) {
-                    loadStatus.textContent = 'Network error: ' + err.message;
-                    loadStatus.style.color = 'var(--error)';
-                }
-            }
 
             // ── Trigger next send ─────────────────────────────────────────────
             triggerBtn.addEventListener('click', async () => {
@@ -1331,5 +1169,6 @@ CertFlow</textarea>
         })();
 
     </script>
+<script src="{{ url_for('static', filename='native_exports.js') }}"></script>
 </body>
 </html>
