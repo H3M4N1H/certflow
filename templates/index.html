@@ -73,7 +73,7 @@ Robert Kumar, AI &amp; DS, Participation, robert@example.com"></textarea>
             <div class="section-title">Step 3 — Text Placement</div>
 
             <div id="certificateEditor"></div>
-            <button class="btn btn-secondary" id="previewBtn" disabled>Preview First Certificate</button>
+            <button class="btn btn-secondary" id="previewBtn" disabled>Preview Selected Certificate</button>
         </div>
 
         <!-- Preview -->
@@ -598,18 +598,19 @@ CertFlow</textarea>
             participants = parseParticipants();
             if (!participants.length) return alert('Add participant data first.');
             if (!templateImage)       return alert('Upload a certificate template first.');
+            const selected = participants[typeof editor !== 'undefined' ? editor.record : 0] || participants[0];
             try {
                 const res = await fetch('/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         template: templateImage,
-                        name: participants[0].name,
-                        department: participants[0].department,
-                        string1: participants[0].string1,
-                        string2: participants[0].string2,
-                        string3: participants[0].string3,
-                        values: participants[0].values,
+                        name: selected.name,
+                        department: selected.department,
+                        string1: selected.string1,
+                        string2: selected.string2,
+                        string3: selected.string3,
+                        values: selected.values,
                         ...getSettings()
                     })
                 });
@@ -618,7 +619,7 @@ CertFlow</textarea>
                     document.getElementById('previewImage').src = result.image;
                     document.getElementById('previewArea').style.display = 'block';
                     document.getElementById('previewImage').scrollIntoView({ behavior: 'smooth' });
-                    document.getElementById('previewBtn').textContent = 'Preview First Certificate';
+                    document.getElementById('previewBtn').textContent = 'Preview Selected Certificate';
                 } else { alert('Preview error: ' + result.error); }
             } catch (err) { alert('Error: ' + err.message); }
         });

@@ -5,7 +5,7 @@ root = Path(SPECPATH).parent
 analysis = Analysis([str(root / 'desktop' / 'main.py')], pathex=[str(root)],
     datas=[(str(root / 'templates'), 'templates'), (str(root / 'static'), 'static')],
     hiddenimports=['app', 'local_runtime', 'local_worker', 'keyring.backends.Windows',
-                   'keyring.backends.SecretService', 'pypdfium2'] + (['webview.platforms.qt', 'PySide6.QtWebEngineWidgets'] if sys.platform.startswith('linux') else []),
+                   'keyring.backends.SecretService', 'pypdfium2'] + (['webview.platforms.qt', 'PySide6.QtWebEngineWidgets'] if sys.platform in ('linux', 'win32') else []),
     excludes=['pytest', 'pandas', 'tkinter'])
 pyz = PYZ(analysis.pure)
 exe = EXE(pyz, analysis.scripts, [], exclude_binaries=True, name='CertFlow',

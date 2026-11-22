@@ -38,7 +38,10 @@ class CertificateEditor {
             const d = {ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];
             if (d) {e.preventDefault(); this.remember(); f.X += d[0]*(e.shiftKey?10:1); f.Y += d[1]*(e.shiftKey?10:1); this.properties(); this.paint();}
         };
-        new ResizeObserver(() => this.scale()).observe(this.viewport);
+        new ResizeObserver(() => {
+            const width=this.viewport.clientWidth;
+            if(width!==this.lastWidth){this.lastWidth=width;requestAnimationFrame(()=>this.scale());}
+        }).observe(this.viewport);
     }
     message(text) { this.root.querySelector('.editor-message').textContent = text; }
     snapshot() { return JSON.stringify(this.fields); }

@@ -16,9 +16,9 @@ with tempfile.TemporaryDirectory() as directory:
     complete = threading.Event()
     def verify():
         try:
-            assert window.evaluate_js("document.querySelector('#certificateEditor') !== null")
-            assert window.evaluate_js("typeof getEmailPayload === 'function'")
-            assert window.evaluate_js("document.querySelectorAll('#mailerSmtpUser').length") == 0
+            assert window.run_js("document.querySelector('#certificateEditor') !== null")
+            assert window.run_js("typeof getEmailPayload === 'function'")
+            assert window.run_js("document.querySelectorAll('#mailerSmtpUser').length") == 0
             complete.set()
         except Exception as exc:
             failures.append(str(exc))

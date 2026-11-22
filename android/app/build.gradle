@@ -11,6 +11,7 @@ android {
         targetSdk 36
         versionCode 1
         versionName '2.0.0'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         ndk { abiFilters 'arm64-v8a', 'x86_64' }
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
@@ -50,4 +51,8 @@ tasks.register('stageAssets', Sync) {
 }
 tasks.configureEach { if ((name.startsWith('generate') || name.startsWith('merge')) && name.contains('Python')) dependsOn 'stagePython' }
 tasks.named('preBuild') { dependsOn 'stagePython', 'stageAssets' }
-dependencies { implementation 'androidx.work:work-runtime:2.10.5' }
+dependencies {
+    implementation 'androidx.work:work-runtime:2.10.5'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+}

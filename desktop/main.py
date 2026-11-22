@@ -16,6 +16,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--background', action='store_true')
     parser.add_argument('--self-test', action='store_true')
+    parser.add_argument('--ui-self-test', action='store_true')
     parser.add_argument('--data-dir', default=user_data_dir('CertFlow', 'CertFlow'))
     args = parser.parse_args()
     local_runtime.configure(args.data_dir)
@@ -47,16 +48,33 @@ def main():
         else:
             import webview
             webview.settings['ALLOW_DOWNLOADS'] = True
-            webview.create_window('CertFlow', url, width=1240, height=850, min_size=(420, 600))
-            if sys.platform.startswith('linux'):
+            window = webview.create_window('CertFlow', url, width=1240, height=850, min_size=(420, 600))
+            verified = []
+            if args.ui_self_test:
+                import threading
+                def check_window():
+                    try:
+                        verified.append(bool(window.run_js("document.querySelector('#certificateEditor') !== null && typeof getEmailPayload === 'function'")))
+                    finally:
+                        window.destroy()
+                window.events.loaded += check_window
+                timer = threading.Timer(45, window.destroy)
+                timer.daemon = True
+                timer.start()
+            if sys.platform in ('linux', 'win32'):
                 os.environ['QT_API'] = 'pyside6'
                 webview.start(gui='qt', icon=str(Path(app.RESOURCE_DIR) / 'static' / 'icon.png'))
             else:
                 webview.start()
+            if args.ui_self_test:
+                timer.cancel()
+                if verified != [True]:
+                    raise RuntimeError('Packaged native UI verification failed')
+                print('CertFlow packaged native UI self-test passed')
     finally:
         worker.stop()
         local_runtime.stop()
-        if not args.self_test and app._mstate_get('desktop_background') == '1':
+        if not args.self_test and not args.ui_self_test and app._mstate_get('desktop_background') == '1':
             command = [sys.executable]
             if not getattr(sys, 'frozen', False):
                 command.append(str(Path(__file__).resolve()))

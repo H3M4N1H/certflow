@@ -94,9 +94,9 @@ dist/CertFlow/CertFlow --self-test --data-dir /tmp/certflow-smoke
 ```
 
 Build on each target OS; PyInstaller does not cross-compile. `dist/CertFlow` contains the
-executable and bundled Python, fonts, templates, Qt/Linux engine and libraries. Keep the
-whole directory together. Windows builds use Edge WebView2; machines lacking the
-Evergreen WebView2 Runtime must install Microsoft's runtime. Inno Setup 6 compiles
+executable and bundled Python, fonts, templates, Qt web engine and libraries. Keep the
+whole directory together. Windows and Linux both bundle the Qt web engine through pywebview; no separate
+WebView2 installation is required. Inno Setup 6 compiles
 `packaging/certflow.iss` into a per-user Windows installer. Production Windows signing
 requires your own Authenticode certificate and timestamp service; none is included.
 
