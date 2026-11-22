@@ -16,8 +16,11 @@ with tempfile.TemporaryDirectory() as directory:
             browser = pw.chromium.launch(headless=True)
             for width, dpi in ((1280, 1), (720, 2), (390, 3)):
                 context = browser.new_context(viewport={'width':width,'height':900}, device_scale_factor=dpi, has_touch=True, accept_downloads=True)
+                context.route('**/*', lambda route: route.continue_() if route.request.url.startswith(url.split('/local/')[0]) else route.abort())
                 page=context.new_page(); errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
                 page.goto(url)
+                assert context.request.get(url.split('/local/')[0]+'/health', headers={'Origin':'https://untrusted.example'}).status == 403
+                assert context.request.post(url.split('/local/')[0]+'/editor/text', data={'fields':[]}).status == 403
                 image=io.BytesIO();Image.new('RGB',(1920,1080),'white').save(image,'PNG')
                 page.locator('#templateFile').set_input_files({'name':'template.png','mimeType':'image/png','buffer':image.getvalue()})
                 page.locator('#csvFile').set_input_files({'name':'people.csv','mimeType':'text/csv','buffer':b'Name,Department,College,Position,Email\nAlice,IT,College A,Winner,a@example.com\nBob,CS,College B,Runner,b@example.com\n'})

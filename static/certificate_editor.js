@@ -83,7 +83,7 @@ class CertificateEditor {
             if(type==='checkbox')input.checked=f[key];else input.value=f[key];
             if(type==='number'){input.step=1;if(key==='FontSize'){input.min=1;input.max=400;}}
             if(key==='Text')input.maxLength=200;
-            input.onchange=()=> {this.remember();f[key]=type==='checkbox'?input.checked:type==='number'||key==='column'?Number(input.value):input.value;
+            input.oninput=()=> {this.remember();f[key]=type==='checkbox'?input.checked:type==='number'||key==='column'?Number(input.value):input.value;
                 if(type==='number')f[key]=Math.round(Math.max(key==='FontSize'?1:-10000,Math.min(key==='FontSize'?400:10000,f[key]||0)));
                 this.refresh();};label.append(input);this.controls.append(label);
         };
