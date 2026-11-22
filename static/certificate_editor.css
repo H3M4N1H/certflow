@@ -1,0 +1,17 @@
+.editor-toolbar {display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0}
+.editor-toolbar button,.editor-load {border:1px solid var(--border);border-radius:6px;padding:8px 12px;background:var(--surface);color:var(--text);cursor:pointer;min-height:44px;font:inherit}
+.editor-toolbar button:hover {border-color:var(--primary)}
+.editor-toolbar label {display:flex;align-items:center;gap:6px}.editor-record{width:70px}.editor-toolbar input[type=checkbox]{width:auto}
+.editor-message{font-size:14px;color:var(--text-secondary);margin-bottom:12px}
+.editor-workspace{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:16px}
+.editor-viewport{overflow:auto;max-height:70vh;min-height:300px;background:#e2e8f0;padding:12px;border-radius:8px;overscroll-behavior:contain}
+.editor-stage{position:relative;isolation:isolate;outline:none;background:white;box-shadow:0 2px 10px #0f172a22}
+.editor-stage:focus-visible{outline:2px solid var(--primary)}
+.editor-template{position:absolute;width:100%;height:100%;pointer-events:none}
+.editor-object{position:absolute;cursor:move;touch-action:none;outline:1px dashed transparent;min-width:12px;min-height:12px}
+.editor-object img{width:100%;height:100%;pointer-events:none}.editor-object:hover{outline-color:var(--primary)}
+.editor-object.selected{outline:2px solid var(--primary)}.editor-resize{display:none;position:absolute;right:-20px;bottom:-20px;width:18px;height:18px;background:var(--primary);border:2px solid white;border-radius:4px;cursor:nwse-resize}
+.editor-object.selected .editor-resize{display:block}.editor-properties label{display:block;margin-bottom:12px;font-size:14px}.editor-properties input,.editor-properties select{width:100%;min-height:40px}.editor-properties input[type=checkbox]{width:24px;min-height:24px;display:block}
+.editor-guide{display:none;position:absolute;left:50%;height:100%;border-left:1px dashed #2563eb;pointer-events:none}.snapping .editor-guide{display:block}
+@media(min-width:1000px){body:has(#certificateEditor) .container{max-width:1180px}}
+@media(max-width:700px){.editor-workspace{grid-template-columns:1fr}.editor-properties{display:grid;grid-template-columns:100px minmax(0,1fr);gap:12px}.editor-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}.editor-viewport{max-height:55vh}.editor-resize{width:24px;height:24px;right:-26px;bottom:-26px}}

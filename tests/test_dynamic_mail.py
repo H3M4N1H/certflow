@@ -127,7 +127,7 @@ class WorkflowTests(unittest.TestCase):
         participants, columns = module.parse_csv_rows([['Alice', 'IT', 'Gold', '2026', 'Meet']], 'no')
         self.assertEqual(len(columns), 5)
         with self.assertRaises(ValueError):
-            module.validate_settings({'fields': [{'column': -1}]})
+            module.validate_settings({'fields': [{'column': -2}]})
         with self.assertRaises(ValueError):
             module.validate_participants([{'name': 'Alice', 'values': ['x' * 201]}])
 
