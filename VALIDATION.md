@@ -14,9 +14,10 @@ Review PR: https://github.com/H3M4N1H/certflow/pull/2
   A local `assembleDebug` retry also could not download Gradle 8.13 because the network
   connection timed out. The previously built debug APK remains at
   `android/app/build/outputs/apk/debug/app-debug.apk`.
-- Final-head CI for commit `6eb1f6b` passed the test, Ubuntu desktop, and Android jobs;
-  the Windows job was still pending when this verification was recorded. No platform
-  gate is inferred from that pending status.
+- CI for commit `7f5e89a` passed the test, Ubuntu desktop, Windows desktop,
+  and Android jobs in run
+  [45031212016](https://github.com/H3M4N1H/certflow/actions/runs/45031212016).
+  The release job was correctly skipped because this is not a tag build.
 
 ## Verified during implementation
 
