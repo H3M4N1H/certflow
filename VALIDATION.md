@@ -3,6 +3,21 @@
 Development branch: `feat/local-apps-interactive-editor`
 Review PR: https://github.com/H3M4N1H/certflow/pull/2
 
+## Continuation verification (2026-11-22)
+
+- Re-ran the host regressions in an isolated Python environment: all 16 Python tests
+  passed, the JavaScript preview test passed, and all required Python modules compiled.
+- Rechecked the protected worktree state: the pre-existing modified `certflow_users.db`
+  and untracked `mailer/` directory were not changed or staged.
+- The current local environment has no `adb` executable, so Android document-provider,
+  notification, Doze, process-death, and device recovery tests could not be executed.
+  A local `assembleDebug` retry also could not download Gradle 8.13 because the network
+  connection timed out. The previously built debug APK remains at
+  `android/app/build/outputs/apk/debug/app-debug.apk`.
+- Final-head CI for commit `6eb1f6b` passed the test, Ubuntu desktop, and Android jobs;
+  the Windows job was still pending when this verification was recorded. No platform
+  gate is inferred from that pending status.
+
 ## Verified during implementation
 
 - 16 Python regressions passed, using temporary databases and mocked SMTP.
